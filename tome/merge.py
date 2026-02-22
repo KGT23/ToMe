@@ -24,7 +24,10 @@ def bipartite_soft_matching(
     """
     Applies ToMe with a balanced matching set (50%, 50%).
 
-    Input size is [batch, tokens, channels].
+    Input size is [batch, tokens, channels]. 헷갈리지 말것! 텐서 구조에 매칭을 batch, tokens, channels로 한다는 것이지
+    공간적 매핑은 [깊이, 행, 열] 순서임!!! -> 이거 잘못 이해해서 한참 돌아서 이해함.
+    4차원 텐서의 경우 [batch, channels, height, width] 인데 [3차원 덩어리가 옆으로 몇개 있는가를 결정하는 값, 깊이, 행, 열]
+    이런 식으로 공간적 매칭됨.
     r indicates the number of tokens to remove (max 50% of tokens).
 
     Extra args:
@@ -47,8 +50,16 @@ def bipartite_soft_matching(
         return do_nothing, do_nothing
 
     with torch.no_grad():
+        
+        # 지금부터 하는 연산들은 학습을 위한 것이 아니므로, 미분값 계산하지 말라고 하는 것
+        # 참고) 파이토치는 기본적으로 모든 연산은 나중에 역전파에 쓰일 수 있다고 가정하고 Autograd(자동 미분) 하고 있음.
+        
         metric = metric / metric.norm(dim=-1, keepdim=True)
-        a, b = metric[..., ::2, :], metric[..., 1::2, :]
+        a, b = metric[..., ::2, :], metric[..., 1::2, :] 
+        
+        # a는 짝수 인덱스 토큰들 (0,2,4,...) b는 홀수 인덱스 토큰들 (1,3,5,...)
+        # A(=a)쪽 토큰이 사라질 후보, B(=b)쪽 토큰이 남아서 대표가 될 후보
+        
         scores = a @ b.transpose(-1, -2)
 
         if class_token:
